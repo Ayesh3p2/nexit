@@ -16,7 +16,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { UserRole } from './enums/user-role.enum';
 import { PaginationDto } from '../../common/dto/pagination.dto';
-import { PaginatedResult } from '../../common/interfaces/paginated-result.interface';
+import { IPaginatedResult } from '../../common/interfaces/paginated-result.interface';
 import { UserFilterDto } from './dto/user-filter.dto';
 
 type FindAllOptions = {
@@ -53,60 +53,67 @@ export class UsersService {
         existingUser.isActive = true;
         existingUser.password = await this.hashPassword(createUserDto.password);
         Object.assign(existingUser, createUserDto);
-        return this.usersRepository.save(existingUser);
-      }
-      throw new HttpException('User with this email already exists', HttpStatus.CONFLICT);
     }
 
     // Hash the password
-    const hashedPassword = await this.hashPassword(createUserDto.password);
-    
-    // Create verification token
-    const emailVerificationToken = uuidv4();
-    const emailVerificationExpires = new Date();
-    emailVerificationExpires.setHours(emailVerificationExpires.getHours() + 24); // 24 hours
-    
-    // Create new user
+    const hashedPassword = await this.hashPassword(password);
+
+    // Create and save the user
     const user = this.usersRepository.create({
-      ...createUserDto,
-      email: createUserDto.email.toLowerCase(),
+      email,
       password: hashedPassword,
-      emailVerificationToken,
-      emailVerificationExpires,
-      isEmailVerified: false,
+      firstName,
+      lastName,
+      role,
       isActive: true,
-      lastPasswordChange: new Date(),
-      createdBy: currentUser?.id || 'system',
+      isEmailVerified: false,
     });
 
+    // Generate email verification token
+    const verificationToken = uuidv4();
+    const verificationExpires = new Date();
+    verificationExpires.setHours(verificationExpires.getHours() + 24); // 24 hours
+    user.emailVerificationToken = verificationToken;
+    user.emailVerificationExpires = verificationExpires;
+
+    // Save the user
     const savedUser = await this.usersRepository.save(user);
     
-    // In a real app, you would send a verification email here
-    // await this.emailService.sendVerificationEmail(user.email, emailVerificationToken);
-    
     // Remove sensitive data before returning
-    const { password, refreshToken, ...result } = savedUser;
-    return result as User;
+    const { password: _, refreshToken, ...userWithoutSensitiveData } = savedUser;
+    return userWithoutSensitiveData as User;
   }
 
-  async findAll(paginationDto?: PaginationDto): Promise<PaginatedResult<User>> {
+  async findAll(paginationDto?: PaginationDto): Promise<IPaginatedResult<User>> {
     const { page = 1, limit = 10 } = paginationDto || {};
     const skip = (page - 1) * limit;
     
-    const [data, total] = await this.usersRepository.findAndCount({
-      where: { isDeleted: false },
+    const [users, total] = await this.usersRepository.findAndCount({
       skip,
       take: limit,
-      order: { createdAt: 'DESC' },
+      where: { isActive: true },
+      relations: ['roles'],
     });
 
+    const totalPages = Math.ceil(total / limit);
+    const hasNextPage = page < totalPages;
+    const hasPreviousPage = page > 1;
+    
     return {
-      data,
+      data: users,
       meta: {
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit),
+        totalPages,
+        hasPreviousPage,
+        hasNextPage,
+      },
+      links: {
+        first: `?page=1&limit=${limit}`,
+        last: `?page=${totalPages}&limit=${limit}`,
+        previous: hasPreviousPage ? `?page=${page - 1}&limit=${limit}` : null,
+        next: hasNextPage ? `?page=${page + 1}&limit=${limit}` : null,
       },
     };
   }
@@ -141,44 +148,38 @@ export class UsersService {
     return user;
   }
 
-  async findByEmail(
-    email: string, 
-    options: { withDeleted?: boolean } = {}
-  ): Promise<User | undefined> {
-    const user = await this.usersRepository.findOne({ 
-      where: { 
-        email: email.toLowerCase(),
-        ...(!options.withDeleted && { isDeleted: false })
-      },
-      withDeleted: options.withDeleted,
-    });
-    
-    if (!user) return undefined;
-    
-    // Remove sensitive data before returning
-    const { password, refreshToken, ...result } = user;
-    return result as User;
+  async findByEmail(email: string, includeInactive = false): Promise<User | undefined> {
+    const where: any = { email };
+    if (!includeInactive) {
+      where.isActive = true;
+    }
+    return this.usersRepository.findOne({ where });
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-    const user = await this.findOne(id);
-    
-    // If email is being updated, check if it's already taken
-    if (updateUserDto.email && updateUserDto.email !== user.email) {
-      const existingUser = await this.findByEmail(updateUserDto.email);
-      if (existingUser) {
-        throw new HttpException('Email already in use', HttpStatus.CONFLICT);
-      }
+  async updateUser(userId: string, updateUserDto: UpdateUserDto, currentUser?: User): Promise<Omit<User, 'password' | 'refreshToken'>> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
 
-    // If password is being updated, hash it
-    if (updateUserDto.password) {
-      updateUserDto.password = await this.hashPassword(updateUserDto.password);
-    }
+    // Check permissions
+    this.checkUpdatePermissions(user, currentUser);
 
-    // Update user
+    // Update user fields
     Object.assign(user, updateUserDto);
-    return this.usersRepository.save(user);
+
+    // If password is being updated, hash it and update lastPasswordChange
+    if (updateUserDto.password) {
+      user.password = await this.hashPassword(updateUserDto.password);
+      user.passwordResetToken = null;
+      user.passwordResetExpires = null;
+    }
+
+    const updatedUser = await this.usersRepository.save(user);
+    
+    // Remove sensitive data before returning
+    const { password, refreshToken, ...result } = updatedUser;
+    return result as User;
   }
 
   async remove(id: string): Promise<void> {

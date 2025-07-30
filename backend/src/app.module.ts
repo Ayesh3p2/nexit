@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, Logger } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { GraphQLModule } from '@nestjs/graphql';
@@ -71,6 +71,7 @@ export const isProduction = process.env.NODE_ENV === 'production';
     // Application Modules
     AuthModule,
     UsersModule,
+    IncidentsModule,
     IncidentsModule,
     ProblemsModule,
     ChangesModule,

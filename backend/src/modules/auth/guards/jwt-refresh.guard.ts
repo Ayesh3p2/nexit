@@ -1,6 +1,7 @@
 import { ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
+import { Observable } from 'rxjs';
 
 @Injectable()
 export class JwtRefreshGuard extends AuthGuard('jwt-refresh') {
@@ -8,14 +9,14 @@ export class JwtRefreshGuard extends AuthGuard('jwt-refresh') {
     super();
   }
 
-  getRequest(context: ExecutionContext) {
+  getRequest(context: ExecutionContext): Request {
     const ctx = context.switchToHttp();
     const request = ctx.getRequest<Request>();
     
     // Extract refresh token from cookies or Authorization header
-    const refreshToken = request.cookies?.refresh_token || 
-                        request.headers['x-refresh-token'] ||
-                        request.body?.refreshToken;
+    const refreshToken = (request.cookies as { refresh_token?: string })?.refresh_token || 
+                        (request.headers as { 'x-refresh-token'?: string | string[] })['x-refresh-token'] ||
+                        (request.body as { refreshToken?: string })?.refreshToken;
     
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token not found');

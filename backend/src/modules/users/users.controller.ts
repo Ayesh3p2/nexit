@@ -43,7 +43,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UserFilterDto } from './dto/user-filter.dto';
 import { User } from './entities/user.entity';
 import { PaginationDto } from '../../common/dto/pagination.dto';
-import { PaginatedResult } from '../../common/interfaces/paginated-result.interface';
+import { IPaginatedResult } from '../../common/interfaces/paginated-result.interface';
 
 @ApiTags('users')
 @Controller('users')
@@ -113,7 +113,7 @@ export class UsersController {
   })
   @ApiOkResponse({ 
     description: 'List of users retrieved successfully',
-    type: PaginatedResult<User>
+    type: IPaginatedResult<User>
   })
   @ApiResponse({ 
     status: HttpStatus.FORBIDDEN, 
@@ -123,7 +123,7 @@ export class UsersController {
     @Query() paginationDto: PaginationDto,
     @Query() filters: UserFilterDto,
     @GetCurrentUser() currentUser: User
-  ): Promise<PaginatedResult<User>> {
+  ): Promise<IPaginatedResult<User>> {
     // Merge pagination and filters into a single object
     const queryOptions = {
       ...paginationDto,

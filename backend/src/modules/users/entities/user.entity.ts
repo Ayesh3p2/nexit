@@ -99,6 +99,32 @@ export class User extends BaseEntity {
   @Column({ name: 'password_reset_expires', type: 'timestamp', nullable: true })
   passwordResetExpires?: Date;
 
+  @ApiProperty({ description: 'Refresh token for JWT refresh', required: false, nullable: true })
+  @Column({ name: 'refresh_token', nullable: true })
+  @Exclude({ toPlainOnly: true })
+  refreshToken?: string;
+
+  @ApiProperty({ description: 'Date when user was deactivated', required: false, nullable: true })
+  @Column({ name: 'deactivated_at', type: 'timestamp', nullable: true })
+  deactivatedAt?: Date | null;
+
+  @ApiProperty({ description: 'ID of admin who deactivated the user', required: false, nullable: true })
+  @Column({ name: 'deactivated_by', type: 'uuid', nullable: true })
+  deactivatedBy?: string | null;
+
+  @ApiProperty({ description: 'New email during email change process', required: false, nullable: true })
+  @Column({ name: 'new_email', nullable: true })
+  newEmail?: string | null;
+
+  @ApiProperty({ description: 'Token for email change verification', required: false, nullable: true })
+  @Column({ name: 'email_change_token', nullable: true })
+  @Exclude({ toPlainOnly: true })
+  emailChangeToken?: string | null;
+
+  @ApiProperty({ description: 'Email change token expiry', required: false, nullable: true })
+  @Column({ name: 'email_change_token_expires', type: 'timestamp', nullable: true })
+  emailChangeTokenExpires?: Date | null;
+
   @ApiProperty({ description: 'User settings as JSON', required: false, nullable: true })
   @Column({ type: 'jsonb', nullable: true })
   settings?: Record<string, any>;
