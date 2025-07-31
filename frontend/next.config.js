@@ -1,12 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-
+  swcMinify: true,
   images: {
     domains: ['localhost'],
   },
   experimental: {
-    serverActions: {},
+    serverActions: true,
   },
   webpack: (config) => {
     // Add support for SVG imports as React components
