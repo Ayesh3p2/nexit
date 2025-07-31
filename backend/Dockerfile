@@ -16,11 +16,14 @@ RUN pnpm install
 # Copy source code
 COPY . .
 
-# Build the application
-RUN pnpm build
+# Copy only production dependencies
+RUN pnpm install --prod
+
+# Copy built files from host
+COPY dist ./dist
 
 # Development command
-CMD ["pnpm", "start:dev"]
+CMD ["pnpm", "start"]
 
 # Production stage
 FROM node:18-alpine AS production

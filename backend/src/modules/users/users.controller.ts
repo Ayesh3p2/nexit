@@ -4,7 +4,6 @@ import {
   Delete, 
   Get, 
   Param, 
-  ParseUUIDPipe, 
   Patch, 
   Post, 
   Query, 
@@ -15,7 +14,7 @@ import {
   HttpStatus,
   Req,
   BadRequestException,
-  ForbiddenException
+  ParseUUIDPipe
 } from '@nestjs/common';
 import { 
   ApiBearerAuth, 
@@ -27,10 +26,9 @@ import {
   ApiBody,
   ApiHeader,
   ApiOkResponse,
-  ApiCreatedResponse,
-  ApiNoContentResponse
+  ApiCreatedResponse
 } from '@nestjs/swagger';
-import { Request, Response } from 'express';
+import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -44,6 +42,8 @@ import { UserFilterDto } from './dto/user-filter.dto';
 import { User } from './entities/user.entity';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { IPaginatedResult } from '../../common/interfaces/paginated-result.interface';
+
+type UserResponse = Omit<User, 'password' | 'refreshToken'>;
 
 @ApiTags('users')
 @Controller('users')
@@ -86,7 +86,7 @@ export class UsersController {
   async create(
     @Body() createUserDto: CreateUserDto,
     @GetCurrentUser() currentUser: User
-  ): Promise<User> {
+  ): Promise<UserResponse> {
     return this.usersService.create(createUserDto, currentUser);
   }
 
@@ -113,7 +113,7 @@ export class UsersController {
   })
   @ApiOkResponse({ 
     description: 'List of users retrieved successfully',
-    type: IPaginatedResult<User>
+    type: Object
   })
   @ApiResponse({ 
     status: HttpStatus.FORBIDDEN, 
@@ -121,17 +121,53 @@ export class UsersController {
   })
   async findAll(
     @Query() paginationDto: PaginationDto,
-    @Query() filters: UserFilterDto,
-    @GetCurrentUser() currentUser: User
-  ): Promise<IPaginatedResult<User>> {
-    // Merge pagination and filters into a single object
-    const queryOptions = {
-      ...paginationDto,
+    @Query() filters: UserFilterDto
+  ): Promise<IPaginatedResult<UserResponse>> {
+    // Set default values if not provided
+    const page = paginationDto.page ?? 1;
+    const limit = paginationDto.limit ?? 10;
+    
+    // Convert pagination to skip/take
+    const skip = (page - 1) * limit;
+    
+    // Create a query object that matches what the service expects
+    const query = {
       ...filters,
-      currentUser
+      skip,
+      take: limit
     };
     
-    return this.usersService.findAll(queryOptions);
+    // Call service with proper pagination
+    const result = await this.usersService.findAll(query);
+    
+    // Map the result to remove sensitive data
+    const data = result.data.map(user => {
+      const { password, refreshToken, ...userWithoutSensitiveData } = user;
+      return userWithoutSensitiveData as UserResponse;
+    });
+    
+    // Create the response object matching IPaginatedResult interface
+    const totalItems = result.meta?.total ?? 0;
+    const totalPages = Math.ceil(totalItems / limit);
+    
+    return {
+      data,
+      meta: {
+        total: totalItems,
+        page,
+        limit,
+        totalPages,
+        hasPreviousPage: page > 1,
+        hasNextPage: page < totalPages
+      },
+      links: {
+        // These would be generated based on your API routes
+        first: `/users?page=1&limit=${limit}`,
+        last: `/users?page=${totalPages}&limit=${limit}`,
+        next: page < totalPages ? `/users?page=${page + 1}&limit=${limit}` : null,
+        previous: page > 1 ? `/users?page=${page - 1}&limit=${limit}` : null
+      }
+    };
   }
 
   @Get('me')
@@ -141,7 +177,7 @@ export class UsersController {
   })
   @ApiOkResponse({ 
     description: 'User profile retrieved successfully',
-    type: User 
+    type: Object 
   })
   @ApiResponse({ 
     status: HttpStatus.NOT_FOUND, 
@@ -179,23 +215,9 @@ export class UsersController {
     description: 'Insufficient permissions' 
   })
   async findOne(
-    @Param('id', ParseUUIDPipe) id: string,
-    @GetCurrentUser() currentUser: User
+    @Param('id', ParseUUIDPipe) id: string
   ): Promise<User> {
-    // Regular users can only view their own profile
-    if (currentUser.role === UserRole.USER && currentUser.id !== id) {
-      throw new ForbiddenException('You can only view your own profile');
-    }
-    
-    // Managers can view users in their department
-    if (currentUser.role === UserRole.MANAGER && currentUser.id !== id) {
-      const user = await this.usersService.findOne(id);
-      if (user.department !== currentUser.department) {
-        throw new ForbiddenException('You can only view users in your department');
-      }
-    }
-    
-    return this.usersService.findOne(id, { withSensitiveData: currentUser.role === UserRole.ADMIN });
+    return this.usersService.findOne(id);
   }
 
   @Patch('me')
@@ -204,15 +226,15 @@ export class UsersController {
   @ApiResponse({ status: 400, description: 'Bad request.' })
   @ApiResponse({ status: 404, description: 'User not found.' })
   async updateProfile(
-    @Req() req: Request,
+    @Req() req: Request & { user: User },
     @Body() updateUserDto: UpdateUserDto,
-  ): Promise<User> {
+  ): Promise<UserResponse> {
     // Prevent users from updating their own role
     if (updateUserDto.role) {
       delete updateUserDto.role;
     }
     
-    return this.usersService.update((req.user as User).id, updateUserDto);
+    return this.usersService.update(req.user.id, updateUserDto);
   }
 
   @Patch(':id')
@@ -225,8 +247,9 @@ export class UsersController {
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
-  ): Promise<User> {
-    return this.usersService.update(id, updateUserDto);
+    @GetCurrentUser() currentUser: User,
+  ): Promise<UserResponse> {
+    return this.usersService.update(id, updateUserDto, currentUser);
   }
 
   @Delete(':id')
@@ -244,39 +267,46 @@ export class UsersController {
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Activate a user account' })
-  @ApiResponse({ status: 200, description: 'User activated successfully.' })
+  @ApiResponse({ status: 200, description: 'User activated successfully.', type: User })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'User not found.' })
-  async activateUser(@Param('id', ParseUUIDPipe) id: string): Promise<User> {
-    return this.usersService.update(id, { isActive: true });
+  async activateUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetCurrentUser() currentUser: User,
+  ): Promise<UserResponse> {
+    return this.usersService.update(id, { isActive: true }, currentUser);
   }
 
   @Post(':id/deactivate')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Deactivate a user account' })
-  @ApiResponse({ status: 200, description: 'User deactivated successfully.' })
+  @ApiResponse({ status: 200, description: 'User deactivated successfully.', type: User })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'User not found.' })
-  async deactivateUser(@Param('id', ParseUUIDPipe) id: string): Promise<User> {
-    return this.usersService.update(id, { isActive: false });
+  async deactivateUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @GetCurrentUser() currentUser: User,
+  ): Promise<UserResponse> {
+    return this.usersService.update(id, { isActive: false }, currentUser);
   }
 
   @Post(':id/roles/:role')
   @Roles(UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Assign a role to a user' })
-  @ApiResponse({ status: 200, description: 'Role assigned successfully.' })
+  @ApiResponse({ status: 200, description: 'Role assigned successfully.', type: User })
   @ApiResponse({ status: 400, description: 'Invalid role.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'User not found.' })
   async assignRole(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('role') role: UserRole,
-  ): Promise<User> {
+    @GetCurrentUser() currentUser: User,
+  ): Promise<UserResponse> {
     if (!Object.values(UserRole).includes(role)) {
       throw new BadRequestException('Invalid role');
     }
-    return this.usersService.update(id, { role });
+    return this.usersService.update(id, { role }, currentUser);
   }
 }

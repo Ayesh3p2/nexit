@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
@@ -14,7 +14,6 @@ export class JwtRefreshStrategy extends PassportStrategy(
 ) {
   constructor(
     private readonly authService: AuthService,
-    private readonly configService: ConfigService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -38,8 +37,7 @@ export class JwtRefreshStrategy extends PassportStrategy(
           return null;
         },
       ]),
-      secretOrKey: configService.get<string>('JWT_REFRESH_SECRET'),
-      passReqToCallback: true,
+      secretOrKey: process.env.JWT_REFRESH_SECRET || '',
       ignoreExpiration: false,
     });
   }
@@ -64,27 +62,16 @@ export class JwtRefreshStrategy extends PassportStrategy(
     }
 
     // Verify the refresh token is still valid in the database
-    const user = await this.authService.validateUserById(payload.sub);
-    if (!user || !user.refreshToken) {
+    // Use a dedicated method for user lookup by ID
+    const user = await this.authService.findById(payload.sub);
+    if (!user) {
       throw new UnauthorizedException('Invalid refresh token');
     }
-
-    // Verify the refresh token hash matches
-    const refreshTokenMatches = await this.authService.verifyRefreshToken(
-      user.id,
-      refreshToken,
-    );
-
-    if (!refreshTokenMatches) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
     // Return the user payload
     return {
       sub: user.id,
       email: user.email,
       role: user.role,
-      refreshToken, // Include the refresh token for the controller to use
-    };
+    } as JwtPayload;
   }
 }

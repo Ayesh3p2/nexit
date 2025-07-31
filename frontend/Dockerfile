@@ -17,7 +17,7 @@ RUN pnpm install
 COPY . .
 
 # Development command
-CMD ["pnpm", "dev", "--host"]
+CMD ["pnpm", "dev"]
 
 # Production stage
 FROM node:18-alpine AS builder

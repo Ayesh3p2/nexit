@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, IsEnum, IsDateString, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 import { UserRole } from '../enums/user-role.enum';

@@ -2,6 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom Animations for Landing Page */
+@layer utilities {
+  .animate-fade-in-up {
+    opacity: 0;
+    transform: translateY(2rem);
+    animation: fadeInUp 0.8s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  }
+  @keyframes fadeInUp {
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .animate-float-slow {
+    animation: floatSlow 8s ease-in-out infinite alternate;
+  }
+  @keyframes floatSlow {
+    from { transform: translateY(0); }
+    to { transform: translateY(-20px); }
+  }
+  .animate-float-reverse {
+    animation: floatReverse 10s ease-in-out infinite alternate;
+  }
+  @keyframes floatReverse {
+    from { transform: translateY(0); }
+    to { transform: translateY(24px); }
+  }
+}
+
+
 @layer base {
   :root {
     --background: 0 0% 100%;

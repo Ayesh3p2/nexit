@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
@@ -11,7 +11,6 @@ import { JwtPayload } from '../types/jwt-payload.type';
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     private readonly authService: AuthService,
-    private readonly configService: ConfigService,
   ) {
     super({
       // Extract JWT from the Authorization header or cookie
@@ -32,38 +31,26 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         },
       ]),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET'),
+      secretOrKey: process.env.JWT_SECRET || '',
       passReqToCallback: true,
     });
   }
 
   async validate(
-    request: Request,
+    _request: Request,
     payload: JwtPayload,
   ): Promise<JwtPayload> {
-    // Check if token is blacklisted (optional, for logout functionality)
-    const isBlacklisted = await this.authService.isTokenBlacklisted(payload.jti);
-    if (isBlacklisted) {
-      throw new UnauthorizedException('Token has been blacklisted');
-    }
-
-    // You could add additional validation here, like checking if the user still exists
-    const user = await this.authService.validateUserById(payload.sub);
+    // Accept either a string (user id) or a payload with sub property
+    const userId = typeof payload === 'string' ? payload : payload.sub;
+    // Use a dedicated method for user lookup by ID
+    const user = await this.authService.findById(userId);
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
-
-    // Check if user is active
-    if (!user.isActive) {
-      throw new UnauthorizedException('Account is deactivated');
-    }
-
-    // Return the user payload to be attached to the request
     return {
       sub: user.id,
       email: user.email,
       role: user.role,
-      // Add any other user properties you want to include in the JWT payload
-    };
+    } as JwtPayload;
   }
 }

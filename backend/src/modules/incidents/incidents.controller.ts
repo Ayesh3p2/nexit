@@ -23,6 +23,7 @@ import {
   IncidentFilterDto,
   CreateIncidentCommentDto
 } from './dto/create-incident.dto';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -60,18 +61,19 @@ export class IncidentsController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'sortBy', required: false, type: String })
-  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'] })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
   async findAll(
     @Query() filter: IncidentFilterDto,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit = 10,
     @Query('sortBy', new DefaultValuePipe('createdAt')) sortBy = 'createdAt',
-    @Query('sortOrder', new DefaultValuePipe('DESC')) sortOrder: 'ASC' | 'DESC' = 'DESC',
+    @Query('sortOrder', new DefaultValuePipe('desc')) sortOrder: 'asc' | 'desc' = 'desc',
     @GetCurrentUser() user: User,
   ): Promise<IPaginatedResult<Incident>> {
+    const pagination = Object.assign(new PaginationDto(), { page, limit, sortBy, sortOrder });
     return this.incidentsService.findAll(
       filter,
-      { page, limit, sortBy, sortOrder },
+      pagination,
       user,
     );
   }

@@ -8,7 +8,7 @@ export class LocalAuthGuard extends AuthGuard('local') {
     const result = (await super.canActivate(context)) as boolean;
     
     // Get the request object
-    const request = context.switchToHttp().getRequest();
+
     
     // If authentication was successful, the user will be attached to the request
     // by the local strategy

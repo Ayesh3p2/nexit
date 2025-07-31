@@ -2,11 +2,11 @@ import {
   Injectable, 
   NotFoundException, 
   BadRequestException,
-  ForbiddenException,
-  ConflictException
+  ForbiddenException
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere, In, Not, IsNull } from 'typeorm';
+import { Repository, In, Not, FindOptionsWhere } from 'typeorm';
+import { UserRole } from '../users/enums/user-role.enum';
 import { Incident } from './entities/incident.entity';
 import { Comment } from './entities/comment.entity';
 import { User } from '../users/entities/user.entity';
@@ -19,7 +19,6 @@ import {
 } from './dto/create-incident.dto';
 import { 
   IncidentStatus, 
-  IncidentPriority, 
   isValidStatusTransition 
 } from './enums/incident.enum';
 import { PaginationDto } from '../../common/dto/pagination.dto';
@@ -62,7 +61,7 @@ export class IncidentsService {
   async findAll(
     filter: IncidentFilterDto,
     pagination: PaginationDto,
-    currentUser: User
+    _currentUser: User // Prefix with underscore to indicate it's intentionally unused
   ): Promise<IPaginatedResult<Incident>> {
     const { page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'DESC' } = pagination;
     const skip = (page - 1) * limit;
@@ -114,12 +113,24 @@ export class IncidentsService {
       take: limit,
     });
     
+    // Return data in IPaginatedResult format with proper pagination metadata
+    const totalPages = Math.ceil(total / limit);
     return {
-      items,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      data: items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasPreviousPage: page > 1,
+        hasNextPage: page < totalPages,
+      },
+      links: {
+        first: `?page=1&limit=${limit}`,
+        previous: page > 1 ? `?page=${page - 1}&limit=${limit}` : null,
+        next: page < totalPages ? `?page=${page + 1}&limit=${limit}` : null,
+        last: `?page=${totalPages}&limit=${limit}`,
+      }
     };
   }
 
@@ -141,7 +152,7 @@ export class IncidentsService {
   
   private checkIncidentAccess(incident: Incident, user: User): void {
     // Admins can access all incidents
-    if (user.role === 'admin') return;
+    if (user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN) return;
     
     // Users can access their own reported or assigned incidents
     const isOwner = incident.reportedBy.id === user.id;
@@ -169,7 +180,8 @@ export class IncidentsService {
     // Check permissions
     if (incident.assignedTo?.id !== currentUser.id && 
         incident.reportedBy.id !== currentUser.id && 
-        currentUser.role !== 'admin') {
+        currentUser.role !== UserRole.ADMIN && 
+        currentUser.role !== UserRole.SUPER_ADMIN) {
       throw new ForbiddenException('You do not have permission to update this incident');
     }
 
@@ -228,7 +240,7 @@ export class IncidentsService {
     }
 
     // Check permissions - only admins or current assignee can reassign
-    const isAdmin = currentUser.role === 'admin';
+    const isAdmin = currentUser.role === UserRole.ADMIN;
     const isCurrentAssignee = incident.assignedTo?.id === currentUser.id;
     
     if (!isAdmin && !isCurrentAssignee) {
@@ -236,11 +248,13 @@ export class IncidentsService {
     }
 
     // Add assignment comment if provided
-    if (assignDto.comment) {
+    if (assignDto.comment && incident) {
       const comment = this.commentRepository.create({
         content: assignDto.comment,
         isInternal: true,
+        userId: currentUser.id,
         user: currentUser,
+        incidentId: incident.id,
         incident,
       });
       await this.commentRepository.save(comment);
@@ -250,7 +264,7 @@ export class IncidentsService {
     incident.assignedTo = assignee;
     
     // If incident was unassigned before, update status to in progress
-    if (!incident.assignedTo && incident.status === IncidentStatus.OPEN) {
+    if (incident.assignedTo && incident.status === IncidentStatus.OPEN) {
       incident.status = IncidentStatus.IN_PROGRESS;
     }
 
@@ -294,10 +308,9 @@ export class IncidentsService {
     }
 
     // Only admins or the reporter can delete
-    if (incident.reportedBy.id !== currentUser.id && currentUser.role !== 'admin') {
+    if (incident.reportedBy.id !== currentUser.id && currentUser.role !== UserRole.ADMIN) {
       throw new ForbiddenException('You do not have permission to delete this incident');
     }
-
     await this.incidentRepository.softRemove(incident);
   }
 
@@ -318,23 +331,24 @@ export class IncidentsService {
       .getRawMany();
 
     const result = {
-      [IncidentStatus.OPEN]: 0,
-      [IncidentStatus.IN_PROGRESS]: 0,
-      [IncidentStatus.ON_HOLD]: 0,
-      [IncidentStatus.RESOLVED]: 0,
-      [IncidentStatus.CLOSED]: 0,
-      [IncidentStatus.CANCELLED]: 0,
+      open: 0,
+      inProgress: 0,
+      onHold: 0,
+      resolved: 0,
+      closed: 0,
+      cancelled: 0,
       total: 0,
     };
 
-    let total = 0;
     stats.forEach(stat => {
-      result[stat.status] = parseInt(stat.count, 10);
-      total += parseInt(stat.count, 10);
+      const status = stat.status.toLowerCase() as keyof typeof result;
+      if (status in result) {
+        const count = parseInt(stat.count, 10);
+        result[status] = count;
+        result.total += count;
+      }
     });
 
-    result.total = total;
-    
     return result;
   }
 }

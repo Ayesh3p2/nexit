@@ -5,16 +5,15 @@ import {
   HttpCode, 
   HttpStatus, 
   Post, 
-  Req, 
+  Query,
   Res, 
-  UseGuards, 
+  UseGuards,
   UseInterceptors, 
   ClassSerializerInterceptor,
-  BadRequestException,
-  UnauthorizedException
+  BadRequestException
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { AuthService } from './auth.service';
@@ -25,8 +24,8 @@ import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { Tokens } from './types/tokens.type';
 import { User } from '../users/entities/user.entity';
-import { GetCurrentUser } from '../common/decorators/get-current-user.decorator';
-import { Public } from '../common/decorators/public.decorator';
+import { GetCurrentUser } from './decorators/get-current-user.decorator';
+import { Public } from './decorators/public.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -85,10 +84,9 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Successfully logged out' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async logout(
-    @GetCurrentUser('sub') userId: string,
     @Res({ passthrough: true }) response: Response,
   ): Promise<{ message: string }> {
-    await this.authService.logout(userId);
+    await this.authService.logout();
     this.clearAuthCookies(response);
     return { message: 'Successfully logged out' };
   }
@@ -211,7 +209,7 @@ export class AuthController {
     const cookieOptions = {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? 'strict' : 'lax',
+      sameSite: isProduction ? 'strict' as const : 'lax' as const,
       maxAge: this.configService.get<number>('JWT_REFRESH_EXPIRES_IN', 7 * 24 * 60 * 60 * 1000), // 7 days
       path: '/',
     };

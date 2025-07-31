@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsOptional, Min } from 'class-validator';
+import { IsIn, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PaginationDto {
@@ -56,10 +56,14 @@ export class PaginationDto {
   sortOrder?: 'asc' | 'desc' = 'desc';
 
   get skip(): number {
-    return (this.page - 1) * this.limit;
+    // Ensure we have valid page and limit values before calculation
+    const page = this.page ?? 1;
+    const limit = this.limit ?? 10;
+    return (page - 1) * limit;
   }
 
   get take(): number {
-    return this.limit;
+    // Ensure we have a valid limit value before returning
+    return this.limit ?? 10;
   }
 }

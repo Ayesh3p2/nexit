@@ -2,7 +2,7 @@ import { registerAs } from '@nestjs/config';
 
 export default registerAs('config', () => ({
   nodeEnv: process.env.NODE_ENV || 'development',
-  port: parseInt(process.env.PORT, 10) || 4000,
+  port: parseInt(process.env.PORT || '4000', 10),
   
   // JWT Configuration
   jwt: {
@@ -15,7 +15,7 @@ export default registerAs('config', () => ({
   // Database Configuration
   database: {
     host: process.env.DATABASE_HOST || 'localhost',
-    port: parseInt(process.env.DATABASE_PORT, 10) || 5432,
+    port: parseInt(process.env.DATABASE_PORT || '5432', 10),
     username: process.env.DATABASE_USERNAME || 'postgres',
     password: process.env.DATABASE_PASSWORD || 'postgres',
     name: process.env.DATABASE_NAME || 'nexit_itsm',
@@ -24,9 +24,9 @@ export default registerAs('config', () => ({
   // Redis Configuration
   redis: {
     host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
     password: process.env.REDIS_PASSWORD || '',
-    ttl: parseInt(process.env.REDIS_TTL, 10) || 3600,
+    ttl: parseInt(process.env.REDIS_TTL || '3600', 10),
   },
   
   // Elasticsearch Configuration
@@ -42,7 +42,7 @@ export default registerAs('config', () => ({
   // Email Configuration
   email: {
     host: process.env.EMAIL_HOST || 'smtp.example.com',
-    port: parseInt(process.env.EMAIL_PORT, 10) || 587,
+    port: parseInt(process.env.EMAIL_PORT || '587', 10),
     secure: process.env.EMAIL_SECURE === 'true',
     auth: {
       user: process.env.EMAIL_USER || 'user@example.com',
@@ -53,15 +53,15 @@ export default registerAs('config', () => ({
   
   // File Upload Configuration
   upload: {
-    maxFileSize: parseInt(process.env.MAX_FILE_SIZE, 10) || 10 * 1024 * 1024, // 10MB
+    maxFileSize: parseInt(process.env.MAX_FILE_SIZE || String(10 * 1024 * 1024), 10), // 10MB
     allowedFileTypes: (process.env.ALLOWED_FILE_TYPES || 'image/jpeg,image/png,application/pdf').split(','),
     uploadPath: process.env.UPLOAD_PATH || './uploads',
   },
   
   // Rate Limiting
   rateLimit: {
-    ttl: parseInt(process.env.RATE_LIMIT_TTL, 10) || 60, // 1 minute
-    limit: parseInt(process.env.RATE_LIMIT, 10) || 100, // 100 requests per IP per minute
+    ttl: parseInt(process.env.RATE_LIMIT_TTL || '60', 10), // 1 minute
+    limit: parseInt(process.env.RATE_LIMIT || '100', 10), // 100 requests per IP per minute
   },
   
   // Feature Flags

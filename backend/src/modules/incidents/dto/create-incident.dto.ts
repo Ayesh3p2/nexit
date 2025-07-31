@@ -5,9 +5,9 @@ import {
   IsEnum, 
   IsUUID, 
   IsArray, 
-  ValidateNested, 
   IsObject,
-  IsDateString
+  IsDateString,
+  IsBoolean
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { 

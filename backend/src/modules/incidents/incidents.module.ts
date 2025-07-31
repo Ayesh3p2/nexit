@@ -8,7 +8,12 @@ import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Incident, Comment]),
+    TypeOrmModule.forFeature([
+      Incident,
+      Comment,
+      // Add User entity for UserRepository injection
+      require('../users/entities/user.entity').User
+    ]),
     UsersModule,
   ],
   controllers: [IncidentsController],

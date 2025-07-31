@@ -1,13 +1,11 @@
 import { 
   BadRequestException, 
   ForbiddenException, 
-  HttpException, 
-  HttpStatus, 
   Injectable, 
   NotFoundException 
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not, Like, IsNull } from 'typeorm';
+import { Repository, IsNull, Not } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -19,12 +17,6 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
 import { IPaginatedResult } from '../../common/interfaces/paginated-result.interface';
 import { UserFilterDto } from './dto/user-filter.dto';
 
-type FindAllOptions = {
-  pagination?: PaginationDto;
-  filters?: UserFilterDto;
-  currentUser?: User;
-};
-
 @Injectable()
 export class UsersService {
   constructor(
@@ -32,27 +24,35 @@ export class UsersService {
     private readonly usersRepository: Repository<User>,
   ) {}
 
-  async create(createUserDto: CreateUserDto, currentUser?: User): Promise<User> {
+  async create(createUserDto: CreateUserDto, currentUser?: User): Promise<Omit<User, 'password' | 'refreshToken'>> {
+    const { email, password, firstName, lastName, role = UserRole.USER } = createUserDto;
+
     // Check permissions if creating admin user
-    if (createUserDto.role === UserRole.ADMIN && 
+    if (role === UserRole.ADMIN && 
         (!currentUser || currentUser.role !== UserRole.ADMIN)) {
       throw new ForbiddenException('Insufficient permissions to create admin user');
     }
 
     // Check if user with email already exists (including soft-deleted)
     const existingUser = await this.usersRepository.findOne({
-      where: { email: createUserDto.email.toLowerCase() },
+      where: { email: email.toLowerCase() },
       withDeleted: true
     });
 
     if (existingUser) {
-      if (existingUser.isDeleted) {
+      if (existingUser.deletedAt) {
         // Reactivate soft-deleted user
         existingUser.isDeleted = false;
-        existingUser.deletedAt = null;
+        existingUser.deletedAt = undefined; // Use undefined for deletedAt
         existingUser.isActive = true;
-        existingUser.password = await this.hashPassword(createUserDto.password);
+        existingUser.password = await this.hashPassword(password);
         Object.assign(existingUser, createUserDto);
+        
+        const savedUser = await this.usersRepository.save(existingUser);
+        const { password: _, refreshToken, ...userWithoutSensitiveData } = savedUser;
+        return userWithoutSensitiveData as User;
+      }
+      throw new BadRequestException('User with this email already exists');
     }
 
     // Hash the password
@@ -60,7 +60,7 @@ export class UsersService {
 
     // Create and save the user
     const user = this.usersRepository.create({
-      email,
+      email: email.toLowerCase(),
       password: hashedPassword,
       firstName,
       lastName,
@@ -81,21 +81,78 @@ export class UsersService {
     
     // Remove sensitive data before returning
     const { password: _, refreshToken, ...userWithoutSensitiveData } = savedUser;
-    return userWithoutSensitiveData as User;
+    return userWithoutSensitiveData;
   }
 
-  async findAll(paginationDto?: PaginationDto): Promise<IPaginatedResult<User>> {
-    const { page = 1, limit = 10 } = paginationDto || {};
-    const skip = (page - 1) * limit;
-    
-    const [users, total] = await this.usersRepository.findAndCount({
+  async findAll(
+    filters: UserFilterDto & PaginationDto & { 
+      skip?: number; 
+      take?: number;
+      currentUser?: User;
+    }
+  ): Promise<IPaginatedResult<User>> {
+    const { 
+      page = 1, 
+      limit = 10, 
       skip,
-      take: limit,
-      where: { isActive: true },
-      relations: ['roles'],
-    });
+      take = limit,
+      search,
+      role,
+      isActive,
+      isEmailVerified,
+      createdAfter,
+      createdBefore,
+      department,
+      includeDeleted
+    } = filters;
 
-    const totalPages = Math.ceil(total / limit);
+    // Build the query
+    const query = this.usersRepository.createQueryBuilder('user');
+
+    // Apply filters
+    if (search) {
+      query.andWhere(
+        '(user.email ILIKE :search OR user.firstName ILIKE :search OR user.lastName ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    if (role) {
+      query.andWhere('user.role = :role', { role });
+    }
+
+    if (isActive !== undefined) {
+      query.andWhere('user.isActive = :isActive', { isActive });
+    }
+
+    if (isEmailVerified !== undefined) {
+      query.andWhere('user.isEmailVerified = :isEmailVerified', { isEmailVerified });
+    }
+
+    if (createdAfter) {
+      query.andWhere('user.createdAt >= :createdAfter', { createdAfter: new Date(createdAfter) });
+    }
+
+    if (createdBefore) {
+      query.andWhere('user.createdAt <= :createdBefore', { createdBefore: new Date(createdBefore) });
+    }
+
+    if (department) {
+      query.andWhere('user.department = :department', { department });
+    }
+
+    // Handle soft-deleted users
+    if (!includeDeleted) {
+      query.andWhere('user.isDeleted = :isDeleted', { isDeleted: false });
+    }
+
+    // Apply pagination
+    const [users, total] = await query
+      .skip(skip)
+      .take(take)
+      .getManyAndCount();
+
+    const totalPages = Math.ceil(total / take);
     const hasNextPage = page < totalPages;
     const hasPreviousPage = page > 1;
     
@@ -104,16 +161,16 @@ export class UsersService {
       meta: {
         total,
         page,
-        limit,
+        limit: take,
         totalPages,
         hasPreviousPage,
         hasNextPage,
       },
       links: {
-        first: `?page=1&limit=${limit}`,
-        last: `?page=${totalPages}&limit=${limit}`,
-        previous: hasPreviousPage ? `?page=${page - 1}&limit=${limit}` : null,
-        next: hasNextPage ? `?page=${page + 1}&limit=${limit}` : null,
+        first: `?page=1&limit=${take}`,
+        last: `?page=${totalPages}&limit=${take}`,
+        previous: hasPreviousPage ? `?page=${page - 1}&limit=${take}` : null, // string | null allowed
+        next: hasNextPage ? `?page=${page + 1}&limit=${take}` : null, // string | null allowed
       },
     };
   }
@@ -153,64 +210,74 @@ export class UsersService {
     if (!includeInactive) {
       where.isActive = true;
     }
-    return this.usersRepository.findOne({ where });
+    const user = await this.usersRepository.findOne({ where });
+    return user === null ? undefined : user;
   }
 
-  async updateUser(userId: string, updateUserDto: UpdateUserDto, currentUser?: User): Promise<Omit<User, 'password' | 'refreshToken'>> {
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
+  async update(id: string, updateUserDto: UpdateUserDto, currentUser?: User): Promise<Omit<User, 'password' | 'refreshToken'>> {
+    const user = await this.usersRepository.findOne({ where: { id } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    // Check permissions
-    this.checkUpdatePermissions(user, currentUser);
-
-    // Update user fields
-    Object.assign(user, updateUserDto);
-
-    // If password is being updated, hash it and update lastPasswordChange
-    if (updateUserDto.password) {
-      user.password = await this.hashPassword(updateUserDto.password);
-      user.passwordResetToken = null;
-      user.passwordResetExpires = null;
+    // Check permissions if trying to update role or sensitive fields
+    if (updateUserDto.role || updateUserDto.isActive !== undefined) {
+      this.checkUpdatePermissions(user, currentUser);
     }
 
-    const updatedUser = await this.usersRepository.save(user);
-    
-    // Remove sensitive data before returning
-    const { password, refreshToken, ...result } = updatedUser;
-    return result as User;
+    // Update user fields
+    const userUpdate: Partial<User> = { ...updateUserDto };
+
+    // If password is being updated, hash it and clear reset tokens
+    if (updateUserDto.password) {
+      userUpdate.password = await this.hashPassword(updateUserDto.password);
+      userUpdate.passwordResetToken = undefined;
+      userUpdate.passwordResetExpires = undefined;
+    }
+
+    await this.usersRepository.update(id, userUpdate);
+    let updatedUser = await this.usersRepository.findOne({ where: { id } });
+if (!updatedUser) {
+  throw new NotFoundException('User not found after update');
+}
+// Remove sensitive data before returning
+const { password, refreshToken, ...result } = updatedUser;
+return result as Omit<User, 'password' | 'refreshToken'>;
+  }
+
+  // Alias for update to maintain backward compatibility
+  async updateUser(id: string, updateUserDto: UpdateUserDto, currentUser?: User): Promise<Omit<User, 'password' | 'refreshToken'>> {
+    return this.update(id, updateUserDto, currentUser);
   }
 
   async remove(id: string): Promise<void> {
-    // Soft delete
-    await this.usersRepository.update(id, { 
-      isDeleted: true,
-      deletedAt: new Date() 
-    });
+    const result = await this.usersRepository.softDelete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
   }
 
   async setUserRefreshToken(userId: string, refreshToken: string): Promise<void> {
     const hashedRefreshToken = refreshToken 
       ? await bcrypt.hash(refreshToken, 10) 
-      : null;
+      : undefined;
     
     await this.usersRepository.update(userId, {
       refreshToken: hashedRefreshToken,
     });
   }
 
-  async getUserIfRefreshTokenMatches(refreshToken: string, userId: string): Promise<User> {
+  async getUserIfRefreshTokenMatches(refreshToken: string, userId: string): Promise<User | undefined> {
     const user = await this.findOne(userId);
-    
+    if (!user || !user.refreshToken) return undefined;
     const isRefreshTokenMatching = await bcrypt.compare(
       refreshToken,
       user.refreshToken,
     );
-
     if (isRefreshTokenMatching) {
       return user;
     }
+    return undefined;
   }
 
   async markEmailAsConfirmed(email: string): Promise<void> {
@@ -259,8 +326,8 @@ export class UsersService {
     
     await this.usersRepository.update(user.id, {
       password: hashedPassword,
-      passwordResetToken: null,
-      passwordResetExpires: null,
+      passwordResetToken: null, // string | null allowed
+      passwordResetExpires: null, // Date | null allowed
     });
   }
 
@@ -284,17 +351,15 @@ export class UsersService {
 
   async reactivateUser(id: string): Promise<User> {
     const user = await this.findOne(id, { withDeleted: true });
-    
     user.isActive = true;
-    user.deactivatedAt = null;
-    user.deactivatedBy = null;
+    user.deactivatedAt = null; // Date | null allowed
+    user.deactivatedBy = null; // string | null allowed
     user.isDeleted = false;
-    
     return this.usersRepository.save(user);
   }
 
   async requestEmailChange(userId: string, newEmail: string): Promise<{ token: string }> {
-    const existingUser = await this.findByEmail(newEmail, { withDeleted: true });
+    const existingUser = await this.findByEmail(newEmail, true);
     if (existingUser) {
       throw new BadRequestException('Email already in use');
     }
@@ -324,11 +389,11 @@ export class UsersService {
       throw new BadRequestException('Invalid or expired token');
     }
 
-    user.email = user.newEmail;
-    user.emailVerified = true;
-    user.newEmail = null;
-    user.emailChangeToken = null;
-    user.emailChangeTokenExpires = null;
+    user.email = user.newEmail || user.email;
+user.isEmailVerified = true;
+    user.newEmail = null; // string | null allowed
+    user.emailChangeToken = null; // string | null allowed
+    user.emailChangeTokenExpires = null; // Date | null allowed
 
     return this.usersRepository.save(user);
   }
@@ -347,17 +412,24 @@ export class UsersService {
   }
 
   private checkUpdatePermissions(user: User, currentUser?: User): void {
-    // Admins can update anyone
-    if (currentUser?.role === UserRole.ADMIN) return;
-    
-    // Users can only update their own profile
-    if (currentUser?.id !== user.id) {
-      throw new ForbiddenException('You can only update your own profile');
+    // If no currentUser, only allow system operations
+    if (!currentUser) {
+      throw new ForbiddenException('Authentication required');
     }
-    
-    // Prevent users from elevating their own privileges
-    if (user.role !== currentUser.role) {
-      throw new ForbiddenException('You cannot change your role');
+
+    // Users can update their own profile
+    if (currentUser.id === user.id) {
+      return;
+    }
+
+    // Only admins can update other users
+    if (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Insufficient permissions to update this user');
+    }
+
+    // Only super admins can update admin users
+    if (user.role === UserRole.ADMIN && currentUser.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Insufficient permissions to update admin user');
     }
   }
 }

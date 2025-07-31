@@ -1,4 +1,4 @@
-import { Module, Logger } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { GraphQLModule } from '@nestjs/graphql';
@@ -19,6 +19,7 @@ export const isProduction = process.env.NODE_ENV === 'production';
 
 @Module({
   imports: [
+    LoggerModule.forRoot(),
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
@@ -51,11 +52,7 @@ export const isProduction = process.env.NODE_ENV === 'production';
       sortSchema: true,
       playground: !isProduction,
       introspection: !isProduction,
-      context: ({ req, res }) => ({ req, res }),
-      cors: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-        credentials: true,
-      },
+      context: ({ req, res }: { req: import('express').Request, res: import('express').Response }) => ({ req, res }),
     }),
 
     // Logging

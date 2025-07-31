@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { IsEmail, IsEnum, IsNotEmpty, IsString } from 'class-validator';
-import { BaseEntity } from 'src/common/entities/base.entity';
+import { BaseEntity } from '../../../common/entities/base.entity';
 import { UserRole } from '../enums/user-role.enum';
 import { Column, Entity, Index } from 'typeorm';
 
@@ -84,25 +84,25 @@ export class User extends BaseEntity {
   @ApiProperty({ description: 'Email verification token', required: false, nullable: true })
   @Column({ name: 'email_verification_token', nullable: true })
   @Exclude({ toPlainOnly: true })
-  emailVerificationToken?: string;
+  emailVerificationToken?: string | null;
 
   @ApiProperty({ description: 'Email verification token expiry', required: false, nullable: true })
   @Column({ name: 'email_verification_expires', type: 'timestamp', nullable: true })
-  emailVerificationExpires?: Date;
+  emailVerificationExpires?: Date | null;
 
   @ApiProperty({ description: 'Password reset token', required: false, nullable: true })
   @Column({ name: 'password_reset_token', nullable: true })
   @Exclude({ toPlainOnly: true })
-  passwordResetToken?: string;
+  passwordResetToken?: string | null;
 
   @ApiProperty({ description: 'Password reset token expiry', required: false, nullable: true })
   @Column({ name: 'password_reset_expires', type: 'timestamp', nullable: true })
-  passwordResetExpires?: Date;
+  passwordResetExpires?: Date | null;
 
   @ApiProperty({ description: 'Refresh token for JWT refresh', required: false, nullable: true })
   @Column({ name: 'refresh_token', nullable: true })
   @Exclude({ toPlainOnly: true })
-  refreshToken?: string;
+  refreshToken?: string | null;
 
   @ApiProperty({ description: 'Date when user was deactivated', required: false, nullable: true })
   @Column({ name: 'deactivated_at', type: 'timestamp', nullable: true })
