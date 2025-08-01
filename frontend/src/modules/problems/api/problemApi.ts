@@ -66,6 +66,12 @@ export const problemApi = {
     return response.data;
   },
 
+  // Update a problem
+  async updateProblem(id: string, data: Partial<CreateProblemData>): Promise<Problem> {
+    const response = await api.patch(`/problems/${id}`, data);
+    return response.data;
+  },
+
   // Update problem status
   async updateProblemStatus(
     id: string, 

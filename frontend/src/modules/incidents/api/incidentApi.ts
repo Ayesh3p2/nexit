@@ -96,6 +96,12 @@ export const incidentApi = {
     await api.delete(`/incidents/${id}`);
   },
 
+  // Update an incident
+  async updateIncident(id: string, data: Partial<CreateIncidentData>): Promise<Incident> {
+    const response = await api.patch(`/incidents/${id}`, data);
+    return response.data;
+  },
+
   // Get incident statistics
   async getIncidentStats() {
     const response = await api.get('/incidents/stats');
