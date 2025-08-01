@@ -1,12 +1,14 @@
+'use client';
+
 import { useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { Table, Badge, Button, TextInput, Card, Title, Text } from '@tremor/react';
-import { ChangeStatus, ChangePriority, ChangeRequest } from '../../types/change.types';
+import { ChangeStatus, ChangePriority, ChangeRequest, ChangeFilters, PaginatedChanges } from '../../types/change.types';
 import { useChanges } from '../../hooks/useChanges';
 import { format } from 'date-fns';
 import { PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
-const statusColors = {
+const statusColors: Record<ChangeStatus, 'gray' | 'blue' | 'yellow' | 'purple' | 'green' | 'red' | 'orange'> = {
   [ChangeStatus.DRAFT]: 'gray',
   [ChangeStatus.SUBMITTED]: 'blue',
   [ChangeStatus.IN_REVIEW]: 'yellow',
@@ -19,7 +21,9 @@ const statusColors = {
   [ChangeStatus.ROLLED_BACK]: 'orange',
 };
 
-const priorityColors = {
+type PriorityColor = 'green' | 'yellow' | 'orange' | 'red';
+
+const priorityColors: Record<ChangePriority, PriorityColor> = {
   [ChangePriority.LOW]: 'green',
   [ChangePriority.MEDIUM]: 'yellow',
   [ChangePriority.HIGH]: 'orange',
@@ -32,10 +36,13 @@ export function ChangeList() {
   const [page, setPage] = useState(1);
   const limit = 10;
 
-  const { data, isLoading } = useChanges({ search }, page, limit);
+  const filters: ChangeFilters = search ? { search } : {};
+  const { data, isLoading, isError } = useChanges(filters, page, limit);
 
   if (isLoading) return <div>Loading...</div>;
-  if (!data) return <div>No data</div>;
+  if (isError || !data) return <div>No data available</div>;
+  
+  const paginatedData = data as unknown as PaginatedChanges;
 
   return (
     <div className="space-y-6">
@@ -66,7 +73,7 @@ export function ChangeList() {
             </tr>
           </thead>
           <tbody>
-            {data.items.map((change) => (
+            {paginatedData.items.map((change: ChangeRequest) => (
               <tr 
                 key={change.id}
                 className="hover:bg-gray-50 cursor-pointer"
@@ -90,7 +97,7 @@ export function ChangeList() {
         </Table>
 
         <div className="mt-4 flex justify-between items-center">
-          <Text>Page {page} of {Math.ceil(data.total / limit)}</Text>
+          <Text>Page {page} of {Math.ceil(paginatedData.total / limit)}</Text>
           <div className="space-x-2">
             <Button 
               size="sm" 

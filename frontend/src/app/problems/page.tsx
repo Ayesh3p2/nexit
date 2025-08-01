@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { Metadata } from 'next';
-import { ProblemList } from '@/modules/problems/components/ProblemList';
+import { ProblemList } from '../../modules/problems/components/ProblemList/ProblemList';
 
 export const metadata: Metadata = {
   title: 'Problems | NexIT ITSM',

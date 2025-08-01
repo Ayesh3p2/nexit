@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { Metadata } from 'next';
-import { IncidentList } from '@/modules/incidents/components/IncidentList';
+import { IncidentList } from '../../modules/incidents/components/IncidentList/IncidentList';
 
 export const metadata: Metadata = {
   title: 'Incidents | NexIT ITSM',

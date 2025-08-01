@@ -1,7 +1,8 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-
   images: {
     domains: ['localhost'],
   },
@@ -15,6 +16,15 @@ const nextConfig = {
       issuer: /\.[jt]sx?$/,
       use: ['@svgr/webpack'],
     });
+
+    // Add path aliases
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': path.resolve(__dirname, 'src'),
+      '@/components': path.resolve(__dirname, 'src/components'),
+      '@/modules': path.resolve(__dirname, 'src/modules'),
+      '@/lib': path.resolve(__dirname, 'src/lib'),
+    };
 
     return config;
   },

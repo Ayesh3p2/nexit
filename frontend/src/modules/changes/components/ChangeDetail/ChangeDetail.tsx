@@ -1,13 +1,15 @@
-import { useRouter } from 'next/router';
-import { Card, Title, Text, Badge, Button, Grid, Flex, TabGroup, TabList, Tab, TabPanels, TabPanel } from '@tremor/react';
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { Card, Title, Text, Badge, Button, Grid } from '@tremor/react';
 import { useChange } from '../../hooks/useChanges';
 import { format } from 'date-fns';
-import { ArrowLeftIcon, PencilIcon, ChatBubbleLeftRightIcon, ClockIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { ChangeStatusControls } from '../ChangeStatusControls/ChangeStatusControls';
 import { ChangeApprovalControls } from '../ChangeApprovalControls/ChangeApprovalControls';
-import { ChangeComments } from '../ChangeComments/ChangeComments';
+import { ChangeRequest } from '../../types/change.types';
 
-const statusColors = {
+const statusColors: Record<string, string> = {
   draft: 'gray',
   submitted: 'blue',
   in_review: 'yellow',
@@ -20,7 +22,7 @@ const statusColors = {
   rolled_back: 'orange',
 };
 
-const priorityColors = {
+const priorityColors: Record<string, string> = {
   low: 'green',
   medium: 'yellow',
   high: 'orange',
@@ -33,10 +35,13 @@ interface ChangeDetailProps {
 
 export function ChangeDetail({ changeId }: ChangeDetailProps) {
   const router = useRouter();
-  const { data: change, isLoading } = useChange(changeId);
+  const { data: changeResponse, isLoading, isError } = useChange(changeId);
 
   if (isLoading) return <div>Loading...</div>;
-  if (!change) return <div>Change not found</div>;
+  if (isError || !changeResponse) return <div>Change not found</div>;
+  
+  // Type assertion to ensure we have the correct type
+  const change = changeResponse as unknown as ChangeRequest;
 
   const formatDate = (dateString: string) => {
     return format(new Date(dateString), 'MMM dd, yyyy HH:mm');
@@ -78,7 +83,7 @@ export function ChangeDetail({ changeId }: ChangeDetailProps) {
             <div>
               <Text>Priority</Text>
               <Badge 
-                color={priorityColors[change.priority.toLowerCase()] as any}
+                color={priorityColors[change.priority.toLowerCase()] as 'green' | 'yellow' | 'orange' | 'red'}
                 className="capitalize mt-1"
               >
                 {change.priority.toLowerCase()}

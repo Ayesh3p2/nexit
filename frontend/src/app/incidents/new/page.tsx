@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import { Suspense } from 'react';
-import { IncidentForm } from '@/modules/incidents/components/IncidentForm';
+import { IncidentForm } from '../../../modules/incidents/components/IncidentForm/IncidentForm';
 
 export const metadata: Metadata = {
   title: 'New Incident | NexIT ITSM',

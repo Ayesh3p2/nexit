@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { Metadata } from 'next';
-import { IncidentDetail } from '@/modules/incidents/components/IncidentDetail';
+import { IncidentDetail } from '../../../modules/incidents/components/IncidentDetail/IncidentDetail';
 
 interface IncidentPageProps {
   params: {

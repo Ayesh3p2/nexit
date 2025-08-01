@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { Metadata } from 'next';
-import { ProblemDetail } from '@/modules/problems/components/ProblemDetail';
+import { ProblemDetail } from '../../../modules/problems/components/ProblemDetail/ProblemDetail';
 
 interface ProblemPageProps {
   params: {
