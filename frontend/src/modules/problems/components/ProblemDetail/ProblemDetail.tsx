@@ -1,5 +1,7 @@
+'use client';
+
 import { useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import React from 'react';
 import { format } from 'date-fns';
 import { 
@@ -25,10 +27,11 @@ import {
   TabPanels,
   TabPanel
 } from '@tremor/react';
-import { Problem, ProblemStatus, ProblemPriority, ProblemImpact } from '../../types/problem.types';
-import { useProblem, useDeleteProblem } from '../../hooks/useProblems';
-import { CommentList } from '../CommentList';
-import { CommentForm } from '../CommentForm';
+import { Problem, ProblemStatus, ProblemPriority, ProblemImpact, User, ProblemEvent, Comment } from '../../types/problem.types';
+import { useProblem as useBaseProblem, useDeleteProblem } from '../../hooks/useProblems';
+import { UseQueryResult } from '@tanstack/react-query';
+import { CommentList } from '../CommentList/CommentList';
+import { CommentForm } from '../CommentForm/CommentForm';
 import { ProblemTimeline } from '../ProblemTimeline';
 
 const statusBadgeMap = {
@@ -57,11 +60,34 @@ interface ProblemDetailProps {
   problemId: string;
 }
 
+// Re-export types from problem.types.ts for consistency
+
+interface ProblemWithDetails extends Omit<Problem, 'comments' | 'events'> {
+  comments: Comment[];
+  events: ProblemEvent[];
+}
+
+// Custom hook to properly type the problem data
+const useProblem = (id: string): UseQueryResult<ProblemWithDetails, Error> => {
+  return useBaseProblem(id) as UseQueryResult<ProblemWithDetails, Error>;
+};
+
 export function ProblemDetail({ problemId }: ProblemDetailProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const { data: problem, isLoading, isError } = useProblem(problemId);
   const deleteMutation = useDeleteProblem();
+  
+  // Mock current user ID - in a real app, this would come from auth context
+  const currentUserId = 'current-user-id';
+  
+  // Mock function to handle comment submission
+  const handleAddComment = async (data: { content: string; isInternal: boolean }) => {
+    // In a real app, this would call the API to add a comment
+    console.log('Adding comment:', data);
+    // Return a promise that resolves when the comment is added
+    return Promise.resolve();
+  };
 
   if (isLoading) return <div>Loading problem details...</div>;
   if (isError || !problem) return <div>Error loading problem</div>;
@@ -289,12 +315,25 @@ export function ProblemDetail({ problemId }: ProblemDetailProps) {
 
             <TabPanel>
               <div className="mt-6">
-                <CommentForm onSubmit={() => {}} isSubmitting={false} />
-                <div className="mt-8">
-                  <Title className="text-lg mb-4">All Comments</Title>
+                <div className="mb-8">
+                  <Title className="text-lg mb-4">Add a Comment</Title>
+                  <CommentForm 
+                    onSubmit={handleAddComment} 
+                    isSubmitting={false} 
+                  />
+                </div>
+                <div>
+                  <Title className="text-lg mb-4">Public Comments</Title>
                   <CommentList 
                     comments={problem.comments || []} 
-                    currentUserId={problem.reportedBy.id} 
+                    isInternal={false}
+                  />
+                </div>
+                <div className="mt-8">
+                  <Title className="text-lg mb-4">Internal Notes</Title>
+                  <CommentList 
+                    comments={problem.comments || []} 
+                    isInternal={true}
                   />
                 </div>
               </div>

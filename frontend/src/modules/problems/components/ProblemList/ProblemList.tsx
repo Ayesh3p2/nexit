@@ -1,5 +1,7 @@
+'use client';
+
 import { useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { PlusIcon, ArrowPathIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { 
   Table, 
@@ -52,15 +54,39 @@ const priorityBadgeMap = {
   [ProblemPriority.CRITICAL]: 'red',
 };
 
+interface ProblemWithId extends Problem {
+  id: string;
+  title: string;
+  status: ProblemStatus;
+  priority: ProblemPriority;
+  impact: ProblemImpact;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface PaginatedProblems {
+  items: ProblemWithId[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export function ProblemList() {
   const router = useRouter();
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
-  const [filters, setFilters] = useState<Partial<ProblemFilters>>({});
   const [showFilters, setShowFilters] = useState(false);
-  
-  const { data, isLoading, isError, error } = useProblems(filters, page, limit);
-  
+  const [filters, setFilters] = useState<Partial<ProblemFilters>>({});
+  const [limit, setLimit] = useState(10);
+
+  const { data, isLoading, isError, error } = useProblems(filters, page, limit) as { 
+    data: PaginatedProblems | undefined; 
+    isLoading: boolean;
+    isError: boolean;
+    error: Error | null;
+    refetch: () => void;
+  };
+
   const handleFilterChange = (key: keyof ProblemFilters, value: any) => {
     setFilters(prev => ({
       ...prev,

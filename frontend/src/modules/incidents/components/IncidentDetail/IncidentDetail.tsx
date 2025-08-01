@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { PencilIcon, TrashIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { Button, Badge, Card, Title, Text, Divider } from '@tremor/react';
-import { useIncident, useDeleteIncident } from '../../../hooks/useIncidents';
-import { Incident, IncidentStatus, IncidentPriority, IncidentImpact } from '../../../types/incident.types';
+import { useIncident, useDeleteIncident } from '../../hooks/useIncidents';
+import { Incident, IncidentStatus, IncidentPriority, IncidentImpact } from '../../types/incident.types';
 
 const statusColors = {
   [IncidentStatus.OPEN]: 'blue',
@@ -34,7 +34,11 @@ const impactColors = {
 export function IncidentDetail({ incidentId }: { incidentId: string }) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
-  const { data: incident, isLoading } = useIncident(incidentId);
+  const { data: incident, isLoading, error } = useIncident(incidentId) as { 
+    data: Incident | undefined; 
+    isLoading: boolean; 
+    error: Error | null;
+  };
   const deleteMutation = useDeleteIncident();
 
   if (isLoading) return <div>Loading...</div>;

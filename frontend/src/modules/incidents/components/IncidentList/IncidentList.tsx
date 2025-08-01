@@ -1,13 +1,23 @@
+'use client';
+
 import { useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { Button, Table, Badge, Card, TextInput, Select, SelectItem } from '@tremor/react';
 import { useIncidents } from '../../hooks/useIncidents';
-import { Incident, IncidentStatus, IncidentPriority } from '../../types/incident.types';
+import { Incident, IncidentStatus, IncidentPriority, PaginatedIncidents } from '../../types/incident.types';
 
 const ITEMS_PER_PAGE = 10;
+
+interface IncidentWithId extends Incident {
+  id: string;
+  title: string;
+  status: IncidentStatus;
+  priority: IncidentPriority;
+  createdAt: string;
+}
 
 export function IncidentList() {
   const router = useRouter();
@@ -18,17 +28,19 @@ export function IncidentList() {
     search: '',
   });
 
-  const { data, isLoading } = useIncidents(
+  const { data: incidentsData, isLoading } = useIncidents(
     {
-      status: filters.status as IncidentStatus || undefined,
-      priority: filters.priority as IncidentPriority || undefined,
+      status: filters.status ? [filters.status as IncidentStatus] : undefined,
+      priority: filters.priority ? [filters.priority as IncidentPriority] : undefined,
       search: filters.search || undefined,
     },
     page,
     ITEMS_PER_PAGE
-  );
+  ) as { data: PaginatedIncidents | undefined; isLoading: boolean };
 
   if (isLoading) return <div>Loading...</div>;
+
+  if (!incidentsData?.items) return <div>No incidents found</div>;
 
   return (
     <Card className="mt-6">
@@ -79,7 +91,7 @@ export function IncidentList() {
           </tr>
         </thead>
         <tbody>
-          {data?.items.map((incident) => (
+          {incidentsData.items.map((incident) => (
             <tr 
               key={incident.id}
               className="hover:bg-gray-50 cursor-pointer"
