@@ -1,8 +1,9 @@
 {
   "compilerOptions": {
-    "baseUrl": "src",
+    "baseUrl": "./src",
     "paths": {
-      "@/*": ["./*"]
+      "@/modules/*": ["modules/*"],
+      "@/lib/*": ["lib/*"]
     },
     "lib": [
       "dom",
