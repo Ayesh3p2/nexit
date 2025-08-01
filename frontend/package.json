@@ -1,46 +1,8 @@
 {
-<<<<<<< HEAD
-  "name": "nexit-itsm",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Next-Gen ITSM Platform with AI-powered automation",
-  "workspaces": [
-    "backend",
-    "frontend",
-    "shared"
-  ],
-  "scripts": {
-    "build": "pnpm -r build",
-    "dev": "pnpm -r --parallel dev",
-    "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "pnpm": ">=8.0.0"
-  },
-  "keywords": [
-    "itsm",
-    "it-service-management",
-    "ai",
-    "automation",
-    "cmdb",
-    "saas-management"
-  ],
-  "author": "NexIT Team",
-  "license": "MIT",
-  "devDependencies": {
-    "@types/node": "^24.1.0",
-    "eslint": "^9.32.0",
-    "prettier": "^3.6.2",
-    "typescript": "^5.8.3"
-  },
-  "packageManager": "pnpm@8.7.0"
-=======
   "name": "@nexit/frontend",
   "version": "0.1.0",
   "private": true,
+  "description": "Next-Gen ITSM Platform with AI-powered automation - Frontend",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -131,6 +93,12 @@
     "tailwindcss": "^4.1.11",
     "ts-jest": "^29.4.0",
     "typescript": "^5.8.3"
-  }
->>>>>>> c3a03ac (Initial frontend commit)
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "author": "NexIT Team",
+  "license": "MIT",
+  "packageManager": "pnpm@8.7.0"
 }
