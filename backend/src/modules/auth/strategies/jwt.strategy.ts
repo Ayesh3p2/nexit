@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-
+import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
@@ -11,6 +11,7 @@ import { JwtPayload } from '../types/jwt-payload.type';
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     private readonly authService: AuthService,
+    private readonly configService: ConfigService,
   ) {
     super({
       // Extract JWT from the Authorization header or cookie
@@ -31,7 +32,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         },
       ]),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || '',
+      secretOrKey: configService.get<string>('JWT_SECRET') || 'your-secret-key',
       passReqToCallback: true,
     });
   }

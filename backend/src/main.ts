@@ -1,9 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger as NestLogger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
-import { Logger } from 'nestjs-pino';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -30,7 +29,8 @@ async function bootstrap() {
   app.use(cookieParser());
   
   // Logger
-  app.useLogger(app.get(Logger));
+  const logger = new NestLogger('NexIT ITSM');
+  app.useLogger(logger);
   
   // Swagger documentation
   const config = new DocumentBuilder()

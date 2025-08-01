@@ -13,13 +13,13 @@ import { ChangesModule } from './modules/changes/changes.module';
 import { AssetsModule } from './modules/assets/assets.module';
 import { SaasModule } from './modules/saas/saas.module';
 import { CmdbModule } from './modules/cmdb/cmdb.module';
+import { HealthModule } from './modules/health/health.module';
 import configuration from './config/configuration';
 
 export const isProduction = process.env.NODE_ENV === 'production';
 
 @Module({
   imports: [
-    LoggerModule.forRoot(),
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
@@ -28,21 +28,18 @@ export const isProduction = process.env.NODE_ENV === 'production';
     }),
 
     // Database
-    TypeOrmModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get('database.host'),
-        port: configService.get('database.port'),
-        username: configService.get('database.username'),
-        password: configService.get('database.password'),
-        database: configService.get('database.name'),
-        entities: [join(__dirname, '**/*.entity.{ts,js}')],
-        synchronize: !isProduction, // Disable in production
-        logging: !isProduction ? ['query', 'error'] : ['error'],
-        migrations: [join(__dirname, 'migrations/*.{ts,js}')],
-        migrationsRun: true,
-      }),
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432', 10),
+      username: process.env.POSTGRES_USER || 'postgres',
+      password: process.env.POSTGRES_PASSWORD || 'postgres',
+      database: process.env.POSTGRES_DB || 'nexit_itsm',
+      entities: [join(__dirname, '**/*.entity.{ts,js}')],
+      synchronize: !isProduction, // Disable in production
+      logging: !isProduction ? ['query', 'error'] : ['error'],
+      migrations: [join(__dirname, 'migrations/*.{ts,js}')],
+      migrationsRun: true,
     }),
 
     // GraphQL
@@ -55,26 +52,16 @@ export const isProduction = process.env.NODE_ENV === 'production';
       context: ({ req, res }: { req: import('express').Request, res: import('express').Response }) => ({ req, res }),
     }),
 
-    // Logging
-    LoggerModule.forRoot({
-      pinoHttp: {
-        level: isProduction ? 'info' : 'debug',
-        transport: !isProduction
-          ? { target: 'pino-pretty', options: { singleLine: true } }
-          : undefined,
-      },
-    }),
-
     // Application Modules
     AuthModule,
     UsersModule,
-    IncidentsModule,
     IncidentsModule,
     ProblemsModule,
     ChangesModule,
     AssetsModule,
     SaasModule,
     CmdbModule,
+    HealthModule,
   ],
   controllers: [],
   providers: [],
