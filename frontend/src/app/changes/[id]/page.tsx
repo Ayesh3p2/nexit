@@ -3,22 +3,18 @@ import { Suspense } from 'react';
 import { Metadata } from 'next';
 import { ChangeDetail } from '@/modules/changes/components/ChangeDetail/ChangeDetail';
 
-interface ChangePageProps {
-  params: {
-    id: string;
-  };
-  searchParams?: { [key: string]: string | string[] | undefined };
-}
+type Props = {
+  params: { id: string };
+};
 
-export async function generateMetadata({ params }: ChangePageProps): Promise<Metadata> {
-  // In a real app, you would fetch the change here to get the title
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `Change #${params.id.substring(0, 8)} | NexIT ITSM`,
   };
 }
 
-export default function ChangePage({ params }: ChangePageProps) {
-  if (!params.id) {
+export default function Page({ params }: { params: { id: string } }) {
+  if (!params?.id) {
     notFound();
   }
 
