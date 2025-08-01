@@ -29,9 +29,14 @@
     "**/*.ts",
     "**/*.tsx",
     "next-env.d.ts",
+    "**/*.js",
+    "**/*.jsx",
+    "**/*.mjs",
+    "**/*.d.ts",
     ".next/types/**/*.ts"
   ],
   "exclude": [
+    "../backend/**/*",
     "node_modules"
   ]
 }

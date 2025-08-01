@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/router';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import type { UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
 import { 
   Incident, 
@@ -124,7 +123,6 @@ export const useAddComment = (incidentId: string) => {
 
 export const useDeleteIncident = () => {
   const queryClient = useQueryClient();
-  const router = useRouter();
   
   return useMutation<void, Error, string>({
     mutationFn: (id) => incidentApi.deleteIncident(id),
@@ -132,7 +130,6 @@ export const useDeleteIncident = () => {
       queryClient.invalidateQueries({ queryKey: [INCIDENTS_QUERY_KEY] });
       queryClient.removeQueries({ queryKey: [INCIDENTS_QUERY_KEY, id] });
       toast.success('Incident deleted successfully');
-      router.push('/incidents');
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to delete incident');
@@ -143,18 +140,18 @@ export const useDeleteIncident = () => {
 
 export const useCreateIncident = () => {
   const queryClient = useQueryClient();
-  const router = useRouter();
   
   return useMutation<Incident, Error, CreateIncidentData>({
     mutationFn: (data) => incidentApi.createIncident(data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [INCIDENTS_QUERY_KEY] });
       toast.success('Incident created successfully');
-      router.push(`/incidents/${data.id}`);
+      return data; // Return the created incident data for the component to handle navigation
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to create incident');
       console.error('Error creating incident:', error);
+      throw error; // Re-throw to allow component to handle the error
     },
   } as UseMutationOptions<Incident, Error, CreateIncidentData>);
 };
