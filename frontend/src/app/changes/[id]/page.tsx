@@ -7,6 +7,7 @@ interface ChangePageProps {
   params: {
     id: string;
   };
+  searchParams?: { [key: string]: string | string[] | undefined };
 }
 
 export async function generateMetadata({ params }: ChangePageProps): Promise<Metadata> {
